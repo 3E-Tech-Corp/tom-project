@@ -20,7 +20,7 @@ export default function Dashboard() {
         <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           <h3 className="text-gray-400 text-sm font-medium">Quick Start</h3>
           <p className="text-white mt-2 text-sm">
-            This is a template project. Customize this dashboard for your application.
+            Welcome to Tom Project!
           </p>
         </div>
       </div>
