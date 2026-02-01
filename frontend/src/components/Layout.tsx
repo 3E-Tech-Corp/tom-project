@@ -1,23 +1,35 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-const navItems = [
+interface NavItem {
+  path: string;
+  label: string;
+  adminOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
   { path: '/', label: '📊 Dashboard' },
-  // Add more nav items here as needed
+  { path: '/catalog', label: '👗 Catalog' },
+  { path: '/selections', label: '💕 My Selections' },
+  { path: '/admin/dresses', label: '🛠️ Manage Dresses', adminOnly: true },
 ];
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+
+  const visibleNavItems = navItems.filter(item => !item.adminOnly || isAdmin);
 
   return (
     <div className="min-h-screen bg-gray-900 flex">
       {/* Sidebar */}
       <aside className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
         <div className="p-6 border-b border-gray-700">
-          <h1 className="text-xl font-bold text-white">Tom Project</h1>
+          <h1 className="text-xl font-bold text-white">👗 Dress Shop</h1>
+          <p className="text-xs text-rose-400 mt-1">Tom's Collection</p>
         </div>
         <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -25,7 +37,7 @@ export default function Layout() {
               className={({ isActive }) =>
                 `block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-rose-600 text-white'
                     : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                 }`
               }

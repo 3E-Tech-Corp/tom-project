@@ -71,10 +71,11 @@ builder.Services.AddCors(options =>
 
 // Register services
 builder.Services.AddSingleton<AuthService>();
+builder.Services.AddSingleton<DressService>();
 
 var app = builder.Build();
 
-// Auto-migration: ensure Users table exists
+// Auto-migration: ensure tables exist
 using (var scope = app.Services.CreateScope())
 {
     var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
@@ -85,6 +86,8 @@ using (var scope = app.Services.CreateScope())
         {
             using var conn = new SqlConnection(connStr);
             await conn.OpenAsync();
+
+            // Users table
             await conn.ExecuteAsync(@"
                 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Users')
                 BEGIN
@@ -99,6 +102,63 @@ using (var scope = app.Services.CreateScope())
                         UpdatedAt DATETIME2 NULL
                     );
                 END");
+
+            // DressCategories table
+            await conn.ExecuteAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DressCategories')
+                BEGIN
+                    CREATE TABLE DressCategories (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,
+                        Name NVARCHAR(100) NOT NULL UNIQUE,
+                        Description NVARCHAR(500) NOT NULL DEFAULT '',
+                        SortOrder INT NOT NULL DEFAULT 0
+                    );
+
+                    -- Seed categories
+                    INSERT INTO DressCategories (Name, Description, SortOrder) VALUES
+                        ('Evening', 'Elegant evening and gala dresses', 1),
+                        ('Casual', 'Comfortable everyday dresses', 2),
+                        ('Wedding', 'Bridal and wedding guest dresses', 3),
+                        ('Cocktail', 'Chic cocktail party dresses', 4),
+                        ('Summer', 'Light and breezy summer dresses', 5),
+                        ('Formal', 'Professional and formal occasion dresses', 6);
+                END");
+
+            // Dresses table
+            await conn.ExecuteAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Dresses')
+                BEGIN
+                    CREATE TABLE Dresses (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,
+                        Name NVARCHAR(200) NOT NULL,
+                        Description NVARCHAR(2000) NOT NULL DEFAULT '',
+                        ImageUrl NVARCHAR(500) NOT NULL DEFAULT '',
+                        Category NVARCHAR(100) NOT NULL DEFAULT '',
+                        Size NVARCHAR(20) NOT NULL DEFAULT '',
+                        Color NVARCHAR(50) NOT NULL DEFAULT '',
+                        Price DECIMAL(10,2) NOT NULL DEFAULT 0,
+                        InStock BIT NOT NULL DEFAULT 1,
+                        CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        UpdatedAt DATETIME2 NULL
+                    );
+                END");
+
+            // UserSelections table
+            await conn.ExecuteAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'UserSelections')
+                BEGIN
+                    CREATE TABLE UserSelections (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,
+                        UserId INT NOT NULL,
+                        DressId INT NOT NULL,
+                        Notes NVARCHAR(500) NOT NULL DEFAULT '',
+                        CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        CONSTRAINT FK_UserSelections_Users FOREIGN KEY (UserId) REFERENCES Users(Id),
+                        CONSTRAINT FK_UserSelections_Dresses FOREIGN KEY (DressId) REFERENCES Dresses(Id) ON DELETE CASCADE,
+                        CONSTRAINT UQ_UserSelections_UserDress UNIQUE (UserId, DressId)
+                    );
+                END");
+
             app.Logger.LogInformation("Database migration completed successfully");
         }
         catch (Exception ex)

@@ -54,5 +54,107 @@ export const api = {
   delete: <T>(endpoint: string) => request<T>(endpoint, { method: 'DELETE' }),
 };
 
+// --- Dress Types ---
+export interface Dress {
+  id: number;
+  name: string;
+  description: string;
+  imageUrl: string;
+  category: string;
+  size: string;
+  color: string;
+  price: number;
+  inStock: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface DressCategory {
+  id: number;
+  name: string;
+  description: string;
+  sortOrder: number;
+}
+
+export interface UserSelection {
+  id: number;
+  userId: number;
+  dressId: number;
+  notes: string;
+  createdAt: string;
+  dressName: string;
+  dressImageUrl: string;
+  dressPrice: number;
+  dressCategory: string;
+  dressSize: string;
+  dressColor: string;
+}
+
+export interface DressFilters {
+  category?: string;
+  size?: string;
+  color?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  search?: string;
+  inStock?: boolean;
+}
+
+export interface CreateDressRequest {
+  name: string;
+  description: string;
+  imageUrl: string;
+  category: string;
+  size: string;
+  color: string;
+  price: number;
+  inStock: boolean;
+}
+
+export interface CreateSelectionRequest {
+  dressId: number;
+  notes: string;
+}
+
+// --- Dress API ---
+function buildQuery(filters: DressFilters): string {
+  const params = new URLSearchParams();
+  if (filters.category) params.set('category', filters.category);
+  if (filters.size) params.set('size', filters.size);
+  if (filters.color) params.set('color', filters.color);
+  if (filters.minPrice !== undefined) params.set('minPrice', filters.minPrice.toString());
+  if (filters.maxPrice !== undefined) params.set('maxPrice', filters.maxPrice.toString());
+  if (filters.search) params.set('search', filters.search);
+  if (filters.inStock !== undefined) params.set('inStock', filters.inStock.toString());
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+export const dressApi = {
+  list: (filters: DressFilters = {}) =>
+    api.get<Dress[]>(`/dresses${buildQuery(filters)}`),
+  get: (id: number) =>
+    api.get<Dress>(`/dresses/${id}`),
+  create: (data: CreateDressRequest) =>
+    api.post<Dress>('/dresses', data),
+  update: (id: number, data: Partial<CreateDressRequest>) =>
+    api.put<Dress>(`/dresses/${id}`, data),
+  delete: (id: number) =>
+    api.delete<{ message: string }>(`/dresses/${id}`),
+  categories: () =>
+    api.get<DressCategory[]>('/dresses/categories'),
+  createCategory: (data: { name: string; description: string; sortOrder: number }) =>
+    api.post<DressCategory>('/dresses/categories', data),
+};
+
+export const selectionApi = {
+  list: () =>
+    api.get<UserSelection[]>('/selections'),
+  add: (data: CreateSelectionRequest) =>
+    api.post<UserSelection>('/selections', data),
+  remove: (id: number) =>
+    api.delete<{ message: string }>(`/selections/${id}`),
+};
+
 export { ApiError };
 export default api;

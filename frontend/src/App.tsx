@@ -3,6 +3,10 @@ import { useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import DressCatalog from './pages/DressCatalog';
+import DressDetail from './pages/DressDetail';
+import MySelections from './pages/MySelections';
+import AdminDresses from './pages/AdminDresses';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -16,6 +20,12 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   }
 
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user?.role !== 'Admin') return <Navigate to="/" />;
+  return <>{children}</>;
 }
 
 export default function App() {
@@ -44,6 +54,17 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="catalog" element={<DressCatalog />} />
+        <Route path="dresses/:id" element={<DressDetail />} />
+        <Route path="selections" element={<MySelections />} />
+        <Route
+          path="admin/dresses"
+          element={
+            <AdminRoute>
+              <AdminDresses />
+            </AdminRoute>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
