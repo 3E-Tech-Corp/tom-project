@@ -75,6 +75,11 @@ builder.Services.AddSingleton<DressService>();
 
 var app = builder.Build();
 
+// Ensure uploads directory exists
+var uploadsPath = Path.Combine(app.Environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "uploads");
+Directory.CreateDirectory(Path.Combine(uploadsPath, "dresses"));
+Directory.CreateDirectory(Path.Combine(uploadsPath, "user-photos"));
+
 // Auto-migration: ensure tables exist
 using (var scope = app.Services.CreateScope())
 {
@@ -159,6 +164,46 @@ using (var scope = app.Services.CreateScope())
                     );
                 END");
 
+            // DressDesigns table (custom design studio)
+            await conn.ExecuteAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DressDesigns')
+                BEGIN
+                    CREATE TABLE DressDesigns (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,
+                        Name NVARCHAR(200) NOT NULL,
+                        ImageUrl NVARCHAR(500) NULL,
+                        BaseStyle NVARCHAR(50) NOT NULL DEFAULT 'a-line',
+                        Customizations NVARCHAR(MAX) NOT NULL DEFAULT '{}',
+                        UserId INT NULL,
+                        IsPreset BIT NOT NULL DEFAULT 0,
+                        CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        UpdatedAt DATETIME2 NULL,
+                        CONSTRAINT FK_DressDesigns_Users FOREIGN KEY (UserId) REFERENCES Users(Id)
+                    );
+
+                    -- Seed preset dress designs
+                    INSERT INTO DressDesigns (Name, BaseStyle, Customizations, IsPreset) VALUES
+                    ('Classic A-Line', 'a-line', '{""length"":75,""strapType"":""thick"",""backStyle"":""closed"",""color"":""#1a1a2e"",""neckline"":""sweetheart""}', 1),
+                    ('Summer Sundress', 'a-line', '{""length"":55,""strapType"":""spaghetti"",""backStyle"":""open"",""color"":""#e8d5b7"",""neckline"":""v-neck""}', 1),
+                    ('Evening Gown', 'mermaid', '{""length"":100,""strapType"":""strapless"",""backStyle"":""low-cut"",""color"":""#722f37"",""neckline"":""sweetheart""}', 1),
+                    ('Cocktail Dress', 'fit-flare', '{""length"":50,""strapType"":""off-shoulder"",""backStyle"":""closed"",""color"":""#2d3436"",""neckline"":""off-shoulder""}', 1),
+                    ('Garden Party', 'a-line', '{""length"":65,""strapType"":""halter"",""backStyle"":""open"",""color"":""#a8e6cf"",""neckline"":""halter""}', 1),
+                    ('Elegant Maxi', 'empire', '{""length"":95,""strapType"":""thick"",""backStyle"":""cross"",""color"":""#dfe6e9"",""neckline"":""scoop""}', 1);
+                END");
+
+            // UserPhotos table (virtual try-on)
+            await conn.ExecuteAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'UserPhotos')
+                BEGIN
+                    CREATE TABLE UserPhotos (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,
+                        UserId INT NOT NULL,
+                        ImageUrl NVARCHAR(500) NOT NULL,
+                        CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        CONSTRAINT FK_UserPhotos_Users FOREIGN KEY (UserId) REFERENCES Users(Id)
+                    );
+                END");
+
             app.Logger.LogInformation("Database migration completed successfully");
         }
         catch (Exception ex)
@@ -175,6 +220,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseStaticFiles();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
