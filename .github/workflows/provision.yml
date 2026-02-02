@@ -3,20 +3,16 @@ name: Provision IIS Site
 on:
   workflow_dispatch:
     inputs:
-      site_name:
-        description: 'IIS Site Name (domain, e.g., myapp.3eweb.com)'
+      project_id:
+        description: 'Project ID (numeric, e.g., 2)'
         required: true
         type: string
-      db_name:
-        description: 'Database name (e.g., my-project_DB)'
+      project_title:
+        description: 'Project title in PascalCase (e.g., ApolloSpark)'
         required: true
         type: string
       domain:
-        description: 'Domain for IIS bindings'
-        required: true
-        type: string
-      project_name:
-        description: 'Human-readable project name'
+        description: 'Public domain (e.g., apollospark.synthia.bot)'
         required: true
         type: string
 
@@ -24,6 +20,8 @@ jobs:
   provision:
     name: Provision IIS + Database
     runs-on: self-hosted
+    env:
+      CONVENTION_NAME: Demo_${{ inputs.project_id }}_${{ inputs.project_title }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,15 +30,14 @@ jobs:
         shell: powershell
         run: |
           .\Deployment\provision-iis.ps1 `
-            -SiteName "${{ github.event.inputs.site_name }}" `
-            -Domain "${{ github.event.inputs.domain }}" `
-            -DatabaseName "${{ github.event.inputs.db_name }}" `
-            -ProjectName "${{ github.event.inputs.project_name }}"
+            -ProjectId ${{ inputs.project_id }} `
+            -ProjectTitle "${{ inputs.project_title }}" `
+            -Domain "${{ inputs.domain }}"
 
       - name: Build and deploy backend
         shell: powershell
         run: |
-          $siteName = "${{ github.event.inputs.site_name }}"
+          $siteName = "${{ env.CONVENTION_NAME }}"
           $backendPath = "F:\New_WWW\$siteName\API"
 
           Write-Host ">> Building backend..." -ForegroundColor Yellow
@@ -49,7 +46,6 @@ jobs:
             --output .\publish\backend
 
           Write-Host ">> Deploying backend to $backendPath ..." -ForegroundColor Yellow
-          # Preserve appsettings.Production.json during copy
           $preserveFiles = @("appsettings.Production.json")
           $tempDir = Join-Path $env:TEMP "provision-preserve-$(Get-Random)"
           New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
@@ -76,7 +72,7 @@ jobs:
       - name: Build and deploy frontend
         shell: powershell
         run: |
-          $siteName = "${{ github.event.inputs.site_name }}"
+          $siteName = "${{ env.CONVENTION_NAME }}"
           $frontendPath = "F:\New_WWW\$siteName\WWW"
 
           Write-Host ">> Building frontend..." -ForegroundColor Yellow
@@ -93,7 +89,7 @@ jobs:
         shell: powershell
         run: |
           Import-Module WebAdministration
-          $appPool = "${{ github.event.inputs.site_name }}"
+          $appPool = "${{ env.CONVENTION_NAME }}"
           Write-Host ">> Restarting app pool: $appPool" -ForegroundColor Yellow
           if ((Get-WebAppPoolState -Name $appPool).Value -eq "Started") {
             Restart-WebAppPool -Name $appPool
@@ -105,7 +101,7 @@ jobs:
       - name: Health check
         shell: powershell
         run: |
-          $domain = "${{ github.event.inputs.domain }}"
+          $domain = "${{ inputs.domain }}"
           Write-Host ">> Waiting for site to start..." -ForegroundColor Yellow
           Start-Sleep -Seconds 8
 
@@ -134,62 +130,52 @@ jobs:
 
           if (!$healthy) {
             Write-Host "   Health check did not pass after $maxRetries attempts (non-fatal)" -ForegroundColor Yellow
-            Write-Host "   The site may need DNS configuration or additional setup" -ForegroundColor Yellow
           }
 
       - name: Output summary
         shell: powershell
         run: |
-          $siteName = "${{ github.event.inputs.site_name }}"
-          $domain = "${{ github.event.inputs.domain }}"
-          $dbName = "${{ github.event.inputs.db_name }}"
-          $projectName = "${{ github.event.inputs.project_name }}"
+          $conventionName = "${{ env.CONVENTION_NAME }}"
+          $domain = "${{ inputs.domain }}"
+          $projectTitle = "${{ inputs.project_title }}"
 
           Write-Host ""
           Write-Host "==========================================================" -ForegroundColor Cyan
           Write-Host " PROVISIONING COMPLETE" -ForegroundColor Green
           Write-Host "==========================================================" -ForegroundColor Cyan
           Write-Host ""
-          Write-Host " Project:    $projectName"
-          Write-Host " Site:       $siteName"
+          Write-Host " Convention: $conventionName"
+          Write-Host " Project:    $projectTitle"
           Write-Host " Domain:     $domain"
-          Write-Host " Database:   $dbName"
-          Write-Host " Frontend:   F:\New_WWW\$siteName\WWW"
-          Write-Host " Backend:    F:\New_WWW\$siteName\API"
+          Write-Host " IIS Site:   $conventionName"
+          Write-Host " App Pool:   $conventionName"
+          Write-Host " Database:   $conventionName"
+          Write-Host " Frontend:   F:\New_WWW\$conventionName\WWW"
+          Write-Host " Backend:    F:\New_WWW\$conventionName\API"
           Write-Host ""
           Write-Host " URLs:"
-          Write-Host "   http://$domain"
-          Write-Host "   http://$domain/api/health"
-          Write-Host "   https://$domain (if SSL configured)"
+          Write-Host "   https://$domain"
+          Write-Host "   https://$domain/api/health"
           Write-Host ""
           Write-Host " Next steps:"
-          Write-Host "   1. Configure DNS A record for $domain → server IP"
-          Write-Host "   2. Verify SSL certificate binding (if needed)"
-          Write-Host "   3. Use Deploy workflow for future deployments"
+          Write-Host "   1. Set IIS_SITE_NAME repo variable to: $conventionName"
+          Write-Host "   2. Use Deploy workflow for future deployments"
           Write-Host "==========================================================" -ForegroundColor Cyan
 
-          # GitHub Actions Job Summary
           $summaryContent = @"
-          ## ✅ Provisioning Complete
+          ## Provisioning Complete
 
           | Property | Value |
           |----------|-------|
-          | **Project** | $projectName |
-          | **Site** | $siteName |
+          | **Convention** | $conventionName |
           | **Domain** | $domain |
-          | **Database** | $dbName |
-          | **Frontend** | ``F:\New_WWW\$siteName\WWW`` |
-          | **Backend** | ``F:\New_WWW\$siteName\API`` |
-
-          ### URLs
-          - http://$domain
-          - http://$domain/api/health
-          - https://$domain *(if SSL configured)*
+          | **IIS Site** | $conventionName |
+          | **App Pool** | $conventionName |
+          | **Database** | $conventionName |
 
           ### Next Steps
-          1. Configure DNS A record for ``$domain``
-          2. Verify SSL certificate binding
-          3. Use **Deploy** workflow for future deployments
+          1. Set ``IIS_SITE_NAME`` repo variable to ``$conventionName``
+          2. Use **Deploy** workflow for future deployments
           "@
 
           $summaryContent | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding UTF8 -Append
