@@ -216,11 +216,11 @@ export default function DressCatalog() {
                 >
                   <div className="aspect-[3/4] overflow-hidden bg-gray-700 relative">
                     <img
-                      src={dress.imageUrl || `https://picsum.photos/seed/dress${dress.id}/400/533`}
+                      src={dress.imageUrl || `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=400&h=533&fit=crop&q=80`}
                       alt={dress.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = `https://picsum.photos/seed/dress${dress.id}/400/533`;
+                        (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=400&h=533&fit=crop&q=80`;
                       }}
                     />
                     {!dress.inStock && (

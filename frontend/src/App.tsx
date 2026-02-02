@@ -45,24 +45,22 @@ export default function App() {
         path="/login"
         element={isAuthenticated ? <Navigate to="/" /> : <Login />}
       />
-      <Route
-        path="/"
-        element={
-          <PrivateRoute>
-            <Layout />
-          </PrivateRoute>
-        }
-      >
-        <Route index element={<Dashboard />} />
+      {/* Public routes — no login required */}
+      <Route path="/" element={<Layout />}>
+        <Route index element={<DressCatalog />} />
         <Route path="catalog" element={<DressCatalog />} />
         <Route path="dresses/:id" element={<DressDetail />} />
-        <Route path="selections" element={<MySelections />} />
+        {/* Protected routes — login required */}
+        <Route path="dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="selections" element={<PrivateRoute><MySelections /></PrivateRoute>} />
         <Route
           path="admin/dresses"
           element={
-            <AdminRoute>
-              <AdminDresses />
-            </AdminRoute>
+            <PrivateRoute>
+              <AdminRoute>
+                <AdminDresses />
+              </AdminRoute>
+            </PrivateRoute>
           }
         />
       </Route>

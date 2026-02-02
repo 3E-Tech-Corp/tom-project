@@ -280,11 +280,11 @@ export default function AdminDresses() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <img
-                        src={dress.imageUrl || `https://picsum.photos/seed/dress${dress.id}/80/80`}
+                        src={dress.imageUrl || `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=80&h=80&fit=crop&q=80`}
                         alt={dress.name}
                         className="w-10 h-10 rounded-lg object-cover"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = `https://picsum.photos/seed/dress${dress.id}/80/80`;
+                          (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=80&h=80&fit=crop&q=80`;
                         }}
                       />
                       <div>
