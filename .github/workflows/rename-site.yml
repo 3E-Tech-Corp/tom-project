@@ -127,24 +127,24 @@ jobs:
 
           try {
             # Check if old DB exists
-            $exists = Invoke-Sqlcmd -Query "SELECT DB_ID('$oldDb') AS DbId" -ServerInstance "localhost" -TrustServerCertificate
+            $exists = Invoke-Sqlcmd -Query "SELECT DB_ID('$oldDb') AS DbId" -ServerInstance "localhost"
             if ($exists.DbId -ne [DBNull]::Value) {
               # Set single user, rename, set multi user
-              Invoke-Sqlcmd -Query "ALTER DATABASE [$oldDb] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;" -ServerInstance "localhost" -TrustServerCertificate
-              Invoke-Sqlcmd -Query "ALTER DATABASE [$oldDb] MODIFY NAME = [$newDb];" -ServerInstance "localhost" -TrustServerCertificate
-              Invoke-Sqlcmd -Query "ALTER DATABASE [$newDb] SET MULTI_USER;" -ServerInstance "localhost" -TrustServerCertificate
+              Invoke-Sqlcmd -Query "ALTER DATABASE [$oldDb] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;" -ServerInstance "localhost"
+              Invoke-Sqlcmd -Query "ALTER DATABASE [$oldDb] MODIFY NAME = [$newDb];" -ServerInstance "localhost"
+              Invoke-Sqlcmd -Query "ALTER DATABASE [$newDb] SET MULTI_USER;" -ServerInstance "localhost"
               Write-Host "Database renamed: $oldDb -> $newDb" -ForegroundColor Green
             } else {
               Write-Host "Old DB not found. Creating new: $newDb" -ForegroundColor Yellow
               $sql = "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'$newDb') CREATE DATABASE [$newDb];"
-              Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -TrustServerCertificate
+              Invoke-Sqlcmd -Query $sql -ServerInstance "localhost"
               Write-Host "Database created: $newDb" -ForegroundColor Green
             }
           } catch {
             Write-Host "DB rename failed: $($_.Exception.Message)" -ForegroundColor Red
             Write-Host "Creating new DB instead..." -ForegroundColor Yellow
             try {
-              Invoke-Sqlcmd -Query "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'$newDb') CREATE DATABASE [$newDb];" -ServerInstance "localhost" -TrustServerCertificate
+              Invoke-Sqlcmd -Query "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'$newDb') CREATE DATABASE [$newDb];" -ServerInstance "localhost"
               Write-Host "Database created: $newDb" -ForegroundColor Green
             } catch {
               Write-Host "DB creation also failed: $($_.Exception.Message)" -ForegroundColor Red

@@ -144,7 +144,7 @@ jobs:
             ELSE
               PRINT 'Database already exists: $dbName';
           "@
-            Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -TrustServerCertificate
+            Invoke-Sqlcmd -Query $sql -ServerInstance "localhost"
             Write-Host "Database ready: $dbName" -ForegroundColor Green
           } catch {
             Write-Host "WARNING: DB creation failed: $($_.Exception.Message)" -ForegroundColor Yellow
