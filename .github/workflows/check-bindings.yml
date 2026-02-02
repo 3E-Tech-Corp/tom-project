@@ -1,0 +1,47 @@
+name: Check IIS Bindings
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: [self-hosted, windows, iis]
+    steps:
+      - name: List all site bindings and certs
+        shell: powershell
+        run: |
+          Import-Module WebAdministration
+          
+          Write-Host "=== All IIS Sites and Bindings ===" -ForegroundColor Cyan
+          Get-Website | ForEach-Object {
+            Write-Host "`nSite: $($_.Name)" -ForegroundColor Yellow
+            Get-WebBinding -Name $_.Name | ForEach-Object {
+              $info = $_.bindingInformation
+              $proto = $_.protocol
+              Write-Host "  $proto $info" -ForegroundColor Gray
+              if ($proto -eq "https") {
+                try {
+                  $certHash = $_.certificateHash
+                  $certStore = $_.certificateStoreName
+                  if ($certHash) {
+                    $cert = Get-ChildItem "Cert:\LocalMachine\$certStore\$certHash" -ErrorAction SilentlyContinue
+                    if ($cert) {
+                      Write-Host "    Cert: $($cert.Subject) [Expires: $($cert.NotAfter)] [Thumbprint: $certHash]" -ForegroundColor Green
+                    } else {
+                      Write-Host "    Cert hash: $certHash (store: $certStore) - NOT FOUND in store" -ForegroundColor Red
+                    }
+                  }
+                } catch {}
+              }
+            }
+          }
+          
+          Write-Host "`n=== All Certs in LocalMachine\My ===" -ForegroundColor Cyan
+          Get-ChildItem Cert:\LocalMachine\My | ForEach-Object {
+            Write-Host "  $($_.Thumbprint) | $($_.Subject) | Expires: $($_.NotAfter)" -ForegroundColor Gray
+          }
+          
+          Write-Host "`n=== All Certs in LocalMachine\WebHosting ===" -ForegroundColor Cyan
+          Get-ChildItem Cert:\LocalMachine\WebHosting -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  $($_.Thumbprint) | $($_.Subject) | Expires: $($_.NotAfter)" -ForegroundColor Gray
+          }
