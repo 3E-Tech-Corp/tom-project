@@ -130,12 +130,9 @@ jobs:
             $exists = Invoke-Sqlcmd -Query "SELECT DB_ID('$oldDb') AS DbId" -ServerInstance "localhost" -TrustServerCertificate
             if ($exists.DbId -ne [DBNull]::Value) {
               # Set single user, rename, set multi user
-              $sql = @"
-                ALTER DATABASE [$oldDb] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-                ALTER DATABASE [$oldDb] MODIFY NAME = [$newDb];
-                ALTER DATABASE [$newDb] SET MULTI_USER;
-              "@
-              Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -TrustServerCertificate
+              Invoke-Sqlcmd -Query "ALTER DATABASE [$oldDb] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;" -ServerInstance "localhost" -TrustServerCertificate
+              Invoke-Sqlcmd -Query "ALTER DATABASE [$oldDb] MODIFY NAME = [$newDb];" -ServerInstance "localhost" -TrustServerCertificate
+              Invoke-Sqlcmd -Query "ALTER DATABASE [$newDb] SET MULTI_USER;" -ServerInstance "localhost" -TrustServerCertificate
               Write-Host "Database renamed: $oldDb -> $newDb" -ForegroundColor Green
             } else {
               Write-Host "Old DB not found. Creating new: $newDb" -ForegroundColor Yellow
