@@ -1,24 +1,29 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface NavItem {
   path: string;
   label: string;
+  requiresAuth?: boolean;
   adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
-  { path: '/', label: '📊 Dashboard' },
-  { path: '/catalog', label: '👗 Catalog' },
-  { path: '/selections', label: '💕 My Selections' },
+  { path: '/', label: '👗 Catalog' },
+  { path: '/dashboard', label: '📊 Dashboard', requiresAuth: true },
+  { path: '/selections', label: '💕 My Selections', requiresAuth: true },
   { path: '/admin/dresses', label: '🛠️ Manage Dresses', adminOnly: true },
 ];
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const isAdmin = user?.role === 'Admin';
 
-  const visibleNavItems = navItems.filter(item => !item.adminOnly || isAdmin);
+  const visibleNavItems = navItems.filter(item => {
+    if (item.adminOnly) return isAdmin;
+    if (item.requiresAuth) return isAuthenticated;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-gray-900 flex">
@@ -47,18 +52,27 @@ export default function Layout() {
           ))}
         </nav>
         <div className="p-4 border-t border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white">{user?.username}</p>
-              <p className="text-xs text-gray-400">{user?.role}</p>
+          {isAuthenticated ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-white">{user?.username}</p>
+                <p className="text-xs text-gray-400">{user?.role}</p>
+              </div>
+              <button
+                onClick={logout}
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Logout
+              </button>
             </div>
-            <button
-              onClick={logout}
-              className="text-sm text-gray-400 hover:text-white transition-colors"
+          ) : (
+            <Link
+              to="/login"
+              className="block w-full text-center px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium rounded-lg transition-colors"
             >
-              Logout
-            </button>
-          </div>
+              Sign In
+            </Link>
+          )}
         </div>
       </aside>
 

@@ -71,11 +71,11 @@ export default function DressDetail() {
         <div className="relative rounded-2xl overflow-hidden bg-gray-800 border border-gray-700">
           <div className="aspect-[3/4]">
             <img
-              src={dress.imageUrl || `https://picsum.photos/seed/dress${dress.id}/600/800`}
+              src={dress.imageUrl || `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=600&h=800&fit=crop&q=80`}
               alt={dress.name}
               className="w-full h-full object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = `https://picsum.photos/seed/dress${dress.id}/600/800`;
+                (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=600&h=800&fit=crop&q=80`;
               }}
             />
           </div>

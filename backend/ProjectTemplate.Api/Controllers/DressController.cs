@@ -20,6 +20,7 @@ public class DressesController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetDresses(
         [FromQuery] string? category,
         [FromQuery] string? size,
@@ -45,6 +46,7 @@ public class DressesController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetDress(int id)
     {
         var dress = await _dressService.GetDressByIdAsync(id);
@@ -82,6 +84,7 @@ public class DressesController : ControllerBase
     }
 
     [HttpGet("categories")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetCategories()
     {
         var categories = await _dressService.GetCategoriesAsync();

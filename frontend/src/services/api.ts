@@ -33,8 +33,10 @@ async function request<T>(endpoint: string, options: ApiOptions = {}): Promise<T
   });
 
   if (response.status === 401) {
-    // Don't redirect for login/setup endpoints — let the form show the error
-    if (!endpoint.includes('/auth/login') && !endpoint.includes('/auth/setup')) {
+    // Don't redirect for public or auth endpoints — let the caller handle it
+    const publicEndpoints = ['/auth/login', '/auth/setup', '/dresses'];
+    const isPublic = publicEndpoints.some(ep => endpoint.includes(ep));
+    if (!isPublic) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
