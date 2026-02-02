@@ -1,0 +1,186 @@
+name: Rename IIS Site
+
+on:
+  workflow_dispatch:
+    inputs:
+      old_site_name:
+        description: 'Current IIS site name'
+        required: true
+        type: string
+      new_site_name:
+        description: 'New IIS site name (Demo_{Id}_{Title})'
+        required: true
+        type: string
+      host_header:
+        description: 'Host header binding (public URL domain)'
+        required: true
+        type: string
+      old_db_name:
+        description: 'Current database name (leave empty to skip)'
+        required: false
+        type: string
+      new_db_name:
+        description: 'New database name (leave empty to skip)'
+        required: false
+        type: string
+
+jobs:
+  rename:
+    name: Rename Site + DB
+    runs-on: [self-hosted, windows, iis]
+    steps:
+      - name: Rename IIS Site
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          Import-Module WebAdministration
+
+          $oldName = "${{ inputs.old_site_name }}"
+          $newName = "${{ inputs.new_site_name }}"
+          $hostHeader = "${{ inputs.host_header }}"
+
+          $oldBase = "F:\New_WWW\$oldName"
+          $newBase = "F:\New_WWW\$newName"
+          $newWww = "$newBase\WWW"
+          $newApi = "$newBase\API"
+
+          Write-Host "Renaming: $oldName -> $newName" -ForegroundColor Cyan
+          Write-Host "Host header: $hostHeader" -ForegroundColor Gray
+
+          # Stop and remove old app pool + site
+          try {
+            $site = Get-Website -Name $oldName -ErrorAction SilentlyContinue
+            if ($site) {
+              # Remove /api virtual app first
+              $apiApp = Get-WebApplication -Site $oldName -Name "api" -ErrorAction SilentlyContinue
+              if ($apiApp) {
+                Remove-WebApplication -Site $oldName -Name "api"
+                Write-Host "Removed old /api virtual app" -ForegroundColor Yellow
+              }
+              Remove-Website -Name $oldName
+              Write-Host "Removed old site: $oldName" -ForegroundColor Yellow
+            }
+          } catch { Write-Host "Warning removing old site: $_" -ForegroundColor Yellow }
+
+          try {
+            if (Test-Path "IIS:\AppPools\$oldName") {
+              Stop-WebAppPool -Name $oldName -ErrorAction SilentlyContinue
+              Start-Sleep -Seconds 2
+              Remove-WebAppPool -Name $oldName
+              Write-Host "Removed old app pool: $oldName" -ForegroundColor Yellow
+            }
+          } catch { Write-Host "Warning removing old pool: $_" -ForegroundColor Yellow }
+
+          # Move files
+          if ((Test-Path $oldBase) -and !(Test-Path $newBase)) {
+            Move-Item -Path $oldBase -Destination $newBase -Force
+            Write-Host "Moved files: $oldBase -> $newBase" -ForegroundColor Green
+          } elseif (Test-Path $oldBase) {
+            # New path exists, copy contents
+            Copy-Item -Path "$oldBase\*" -Destination $newBase -Recurse -Force
+            Remove-Item $oldBase -Recurse -Force
+            Write-Host "Copied and cleaned: $oldBase -> $newBase" -ForegroundColor Green
+          } else {
+            # No old path, create new
+            foreach ($dir in @($newBase, $newWww, $newApi)) {
+              if (!(Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+            }
+            Write-Host "Created fresh directories at $newBase" -ForegroundColor Green
+          }
+
+          # Ensure subdirs exist
+          foreach ($dir in @($newWww, $newApi)) {
+            if (!(Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+          }
+
+          # Create new app pool
+          if (!(Test-Path "IIS:\AppPools\$newName")) {
+            New-WebAppPool -Name $newName
+            Set-ItemProperty "IIS:\AppPools\$newName" -Name managedRuntimeVersion -Value "v4.0"
+            Set-ItemProperty "IIS:\AppPools\$newName" -Name managedPipelineMode -Value "Integrated"
+            Write-Host "Created app pool: $newName" -ForegroundColor Green
+          }
+
+          # Create new site
+          if (!(Get-Website -Name $newName -ErrorAction SilentlyContinue)) {
+            New-Website -Name $newName -PhysicalPath $newWww -ApplicationPool $newName -HostHeader $hostHeader -Port 80
+            Write-Host "Created site: $newName (http://$hostHeader)" -ForegroundColor Green
+          }
+
+          # Create /api virtual app
+          $apiApp = Get-WebApplication -Site $newName -Name "api" -ErrorAction SilentlyContinue
+          if (!$apiApp) {
+            New-WebApplication -Site $newName -Name "api" -PhysicalPath $newApi -ApplicationPool $newName
+            Write-Host "Created /api virtual app" -ForegroundColor Green
+          }
+
+          Write-Host "`nSite rename complete!" -ForegroundColor Green
+
+      - name: Rename Database
+        if: inputs.old_db_name != '' && inputs.new_db_name != ''
+        shell: powershell
+        run: |
+          $oldDb = "${{ inputs.old_db_name }}"
+          $newDb = "${{ inputs.new_db_name }}"
+
+          Write-Host "Renaming DB: $oldDb -> $newDb" -ForegroundColor Cyan
+
+          try {
+            # Check if old DB exists
+            $exists = Invoke-Sqlcmd -Query "SELECT DB_ID('$oldDb') AS DbId" -ServerInstance "localhost" -TrustServerCertificate
+            if ($exists.DbId -ne [DBNull]::Value) {
+              # Set single user, rename, set multi user
+              $sql = @"
+                ALTER DATABASE [$oldDb] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                ALTER DATABASE [$oldDb] MODIFY NAME = [$newDb];
+                ALTER DATABASE [$newDb] SET MULTI_USER;
+              "@
+              Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -TrustServerCertificate
+              Write-Host "Database renamed: $oldDb -> $newDb" -ForegroundColor Green
+            } else {
+              Write-Host "Old DB not found. Creating new: $newDb" -ForegroundColor Yellow
+              $sql = "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'$newDb') CREATE DATABASE [$newDb];"
+              Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -TrustServerCertificate
+              Write-Host "Database created: $newDb" -ForegroundColor Green
+            }
+          } catch {
+            Write-Host "DB rename failed: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "Creating new DB instead..." -ForegroundColor Yellow
+            try {
+              Invoke-Sqlcmd -Query "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'$newDb') CREATE DATABASE [$newDb];" -ServerInstance "localhost" -TrustServerCertificate
+              Write-Host "Database created: $newDb" -ForegroundColor Green
+            } catch {
+              Write-Host "DB creation also failed: $($_.Exception.Message)" -ForegroundColor Red
+            }
+          }
+
+      - name: Update appsettings.Production.json
+        if: inputs.new_db_name != ''
+        shell: powershell
+        run: |
+          $newName = "${{ inputs.new_site_name }}"
+          $newDb = "${{ inputs.new_db_name }}"
+          $hostHeader = "${{ inputs.host_header }}"
+          $configPath = "F:\New_WWW\$newName\API\appsettings.Production.json"
+
+          if (Test-Path $configPath) {
+            $config = Get-Content $configPath -Raw | ConvertFrom-Json
+            $config.ConnectionStrings.DefaultConnection = "Server=localhost;Database=$newDb;User ID=ftsql;Password=letsroc;TrustServerCertificate=true;MultipleActiveResultSets=true"
+            if ($config.Cors -and $config.Cors.Origins) {
+              $config.Cors.Origins = "https://$hostHeader"
+            }
+            $config | ConvertTo-Json -Depth 5 | Set-Content $configPath
+            Write-Host "Updated connection string to use $newDb" -ForegroundColor Green
+          } else {
+            Write-Host "No appsettings.Production.json found at $configPath" -ForegroundColor Yellow
+          }
+
+          # Restart app pool to pick up changes
+          try {
+            Stop-WebAppPool -Name $newName -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+            Start-WebAppPool -Name $newName
+            Write-Host "App pool restarted" -ForegroundColor Green
+          } catch {
+            Write-Host "Warning restarting pool: $_" -ForegroundColor Yellow
+          }
