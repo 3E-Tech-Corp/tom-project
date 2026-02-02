@@ -23,46 +23,34 @@ jobs:
           $siteName = "${{ inputs.site_name }}"
           $hostHeader = "${{ inputs.host_header }}"
 
-          # List all certs for debugging
-          Write-Host "=== Certificates in LocalMachine\My ===" -ForegroundColor Cyan
-          Get-ChildItem Cert:\LocalMachine\My | ForEach-Object {
-            $san = ($_.Extensions | Where-Object { $_.Oid.FriendlyName -eq "Subject Alternative Name" } | ForEach-Object { $_.Format($false) })
-            Write-Host "  Subject: $($_.Subject)" -ForegroundColor Gray
-            Write-Host "  SAN: $san" -ForegroundColor Gray
-            Write-Host "  Expires: $($_.NotAfter)" -ForegroundColor Gray
-            Write-Host "  Thumbprint: $($_.Thumbprint)" -ForegroundColor Gray
-            Write-Host ""
-          }
-
-          # Try to find cert - look for synthia.bot in subject or SAN
-          $cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object {
-            $subj = $_.Subject
-            $san = ($_.Extensions | Where-Object { $_.Oid.FriendlyName -eq "Subject Alternative Name" } | ForEach-Object { $_.Format($false) })
-            $subj -like "*synthia*" -or $san -like "*synthia*"
+          # Find synthia.bot cert in WebHosting store
+          $cert = Get-ChildItem Cert:\LocalMachine\WebHosting -ErrorAction SilentlyContinue | Where-Object {
+            $_.Subject -like "*synthia.bot*"
           } | Sort-Object NotAfter -Descending | Select-Object -First 1
 
-          # If no synthia cert, try wildcard certs
+          # Fallback: check My store
           if (-not $cert) {
             $cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object {
-              $_.Subject -like "CN=*.*" -or $_.Subject -like "*wildcard*"
+              $_.Subject -like "*synthia.bot*"
             } | Sort-Object NotAfter -Descending | Select-Object -First 1
           }
 
           if (-not $cert) {
-            Write-Host "No matching certificate found. See list above." -ForegroundColor Red
-            Write-Host "You may need to specify the thumbprint manually." -ForegroundColor Yellow
+            Write-Host "ERROR: No synthia.bot certificate found" -ForegroundColor Red
             exit 1
           }
 
-          Write-Host "Using cert: $($cert.Subject) [$($cert.Thumbprint)]" -ForegroundColor Green
+          $certStore = if ((Get-ChildItem "Cert:\LocalMachine\WebHosting\$($cert.Thumbprint)" -ErrorAction SilentlyContinue)) { "WebHosting" } else { "My" }
+          Write-Host "Using cert: $($cert.Subject) [Store: $certStore] [Expires: $($cert.NotAfter)]" -ForegroundColor Green
 
-          # Check if HTTPS binding already exists
+          # Remove existing HTTPS binding if wrong cert, then add correct one
           $existing = Get-WebBinding -Name $siteName -Protocol https -ErrorAction SilentlyContinue
           if ($existing) {
-            Write-Host "HTTPS binding already exists for $siteName" -ForegroundColor Yellow
-          } else {
-            New-WebBinding -Name $siteName -Protocol https -Port 443 -HostHeader $hostHeader -SslFlags 1
-            $binding = Get-WebBinding -Name $siteName -Protocol https
-            $binding.AddSslCertificate($cert.Thumbprint, "My")
-            Write-Host "HTTPS binding added: https://$hostHeader (SNI)" -ForegroundColor Green
+            Write-Host "Removing existing HTTPS binding..." -ForegroundColor Yellow
+            Remove-WebBinding -Name $siteName -Protocol https -Port 443 -HostHeader $hostHeader
           }
+
+          New-WebBinding -Name $siteName -Protocol https -Port 443 -HostHeader $hostHeader -SslFlags 1
+          $binding = Get-WebBinding -Name $siteName -Protocol https
+          $binding.AddSslCertificate($cert.Thumbprint, $certStore)
+          Write-Host "HTTPS binding added: https://$hostHeader (SNI, $certStore store)" -ForegroundColor Green
