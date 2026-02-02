@@ -122,10 +122,31 @@ jobs:
             Write-Host "SPA web.config created" -ForegroundColor Green
           }
 
+          # Add HTTPS binding with wildcard cert
+          $existingHttps = Get-WebBinding -Name $siteName -Protocol https -ErrorAction SilentlyContinue
+          if (-not $existingHttps) {
+            $cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object {
+              $_.Subject -like "*synthia.bot*" -or
+              ($_.Extensions | Where-Object { $_.Oid.FriendlyName -eq "Subject Alternative Name" } |
+               ForEach-Object { $_.Format($false) }) -like "*synthia.bot*"
+            } | Sort-Object NotAfter -Descending | Select-Object -First 1
+
+            if ($cert) {
+              New-WebBinding -Name $siteName -Protocol https -Port 443 -HostHeader $hostHeader -SslFlags 1
+              $binding = Get-WebBinding -Name $siteName -Protocol https
+              $binding.AddSslCertificate($cert.Thumbprint, "My")
+              Write-Host "HTTPS binding added (SNI, wildcard cert)" -ForegroundColor Green
+            } else {
+              Write-Host "WARNING: No wildcard cert found for *.synthia.bot — HTTPS not configured" -ForegroundColor Yellow
+            }
+          } else {
+            Write-Host "HTTPS binding already exists" -ForegroundColor Gray
+          }
+
           Write-Host "`n========================================" -ForegroundColor Cyan
           Write-Host "Setup complete!" -ForegroundColor Green
-          Write-Host "Site: http://$hostHeader" -ForegroundColor Gray
-          Write-Host "API:  http://$hostHeader/api" -ForegroundColor Gray
+          Write-Host "Site: https://$hostHeader" -ForegroundColor Gray
+          Write-Host "API:  https://$hostHeader/api" -ForegroundColor Gray
           Write-Host "========================================" -ForegroundColor Cyan
 
       - name: Create Database

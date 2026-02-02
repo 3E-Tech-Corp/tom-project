@@ -1,0 +1,50 @@
+name: Add HTTPS Binding
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_name:
+        description: 'IIS Site Name'
+        required: true
+        type: string
+      host_header:
+        description: 'Host header (domain)'
+        required: true
+        type: string
+
+jobs:
+  bind:
+    runs-on: [self-hosted, windows, iis]
+    steps:
+      - name: Add HTTPS binding
+        shell: powershell
+        run: |
+          Import-Module WebAdministration
+          $siteName = "${{ inputs.site_name }}"
+          $hostHeader = "${{ inputs.host_header }}"
+
+          # Find the wildcard cert for *.synthia.bot
+          $cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object {
+            $_.Subject -like "*synthia.bot*" -or
+            ($_.Extensions | Where-Object { $_.Oid.FriendlyName -eq "Subject Alternative Name" } | 
+             ForEach-Object { $_.Format($false) }) -like "*synthia.bot*"
+          } | Sort-Object NotAfter -Descending | Select-Object -First 1
+
+          if (-not $cert) {
+            Write-Host "ERROR: No wildcard certificate found for *.synthia.bot" -ForegroundColor Red
+            exit 1
+          }
+
+          Write-Host "Found cert: $($cert.Subject) (expires $($cert.NotAfter))" -ForegroundColor Green
+          Write-Host "Thumbprint: $($cert.Thumbprint)" -ForegroundColor Gray
+
+          # Check if HTTPS binding already exists
+          $existing = Get-WebBinding -Name $siteName -Protocol https -ErrorAction SilentlyContinue
+          if ($existing) {
+            Write-Host "HTTPS binding already exists for $siteName" -ForegroundColor Yellow
+          } else {
+            New-WebBinding -Name $siteName -Protocol https -Port 443 -HostHeader $hostHeader -SslFlags 1
+            $binding = Get-WebBinding -Name $siteName -Protocol https
+            $binding.AddSslCertificate($cert.Thumbprint, "My")
+            Write-Host "HTTPS binding added: https://$hostHeader (SNI)" -ForegroundColor Green
+          }
