@@ -1,0 +1,61 @@
+name: Fix Database Permissions
+
+on:
+  workflow_dispatch:
+    inputs:
+      db_name:
+        description: 'Database name'
+        required: true
+        type: string
+      sql_user:
+        description: 'SQL user to grant access'
+        required: false
+        default: 'ftsql'
+        type: string
+
+jobs:
+  fix:
+    runs-on: [self-hosted, windows, iis]
+    steps:
+      - name: Grant DB access
+        shell: powershell
+        run: |
+          $db = "${{ inputs.db_name }}"
+          $user = "${{ inputs.sql_user }}"
+          
+          Write-Host "Granting $user access to $db..." -ForegroundColor Cyan
+          
+          $sql = @"
+            USE [$db];
+            IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = '$user')
+            BEGIN
+              CREATE USER [$user] FOR LOGIN [$user];
+              PRINT 'User created';
+            END
+            ALTER ROLE db_datareader ADD MEMBER [$user];
+            ALTER ROLE db_datawriter ADD MEMBER [$user];
+            ALTER ROLE db_ddladmin ADD MEMBER [$user];
+            GRANT EXECUTE TO [$user];
+            PRINT 'Permissions granted: datareader, datawriter, ddladmin, execute';
+"@
+          try {
+            Invoke-Sqlcmd -Query $sql -ServerInstance "localhost"
+            Write-Host "Permissions granted successfully" -ForegroundColor Green
+          } catch {
+            Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+            exit 1
+          }
+
+      - name: Restart app pool
+        shell: powershell
+        run: |
+          Import-Module WebAdministration
+          $pools = Get-ChildItem IIS:\AppPools | Where-Object { $_.Name -like "Demo_*" }
+          foreach ($pool in $pools) {
+            if ($pool.State -eq "Started") {
+              Stop-WebAppPool -Name $pool.Name
+              Start-Sleep -Seconds 2
+              Start-WebAppPool -Name $pool.Name
+              Write-Host "Recycled: $($pool.Name)" -ForegroundColor Green
+            }
+          }

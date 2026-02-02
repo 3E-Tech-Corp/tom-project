@@ -167,6 +167,11 @@ jobs:
           "@
             Invoke-Sqlcmd -Query $sql -ServerInstance "localhost"
             Write-Host "Database ready: $dbName" -ForegroundColor Green
+            
+            # Grant ftsql access to the new database
+            $grantSql = "USE [$dbName]; IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = 'ftsql') BEGIN CREATE USER [ftsql] FOR LOGIN [ftsql]; END; ALTER ROLE db_datareader ADD MEMBER [ftsql]; ALTER ROLE db_datawriter ADD MEMBER [ftsql]; ALTER ROLE db_ddladmin ADD MEMBER [ftsql]; GRANT EXECUTE TO [ftsql];"
+            Invoke-Sqlcmd -Query $grantSql -ServerInstance "localhost"
+            Write-Host "Granted ftsql permissions on $dbName" -ForegroundColor Green
           } catch {
             Write-Host "WARNING: DB creation failed: $($_.Exception.Message)" -ForegroundColor Yellow
             Write-Host "Create it manually if needed." -ForegroundColor Yellow
