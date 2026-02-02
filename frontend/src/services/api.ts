@@ -33,10 +33,14 @@ async function request<T>(endpoint: string, options: ApiOptions = {}): Promise<T
   });
 
   if (response.status === 401) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-    throw new ApiError('Unauthorized', 401);
+    // Don't redirect for login/setup endpoints — let the form show the error
+    if (!endpoint.includes('/auth/login') && !endpoint.includes('/auth/setup')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    const error = await response.json().catch(() => ({ message: 'Unauthorized' }));
+    throw new ApiError(error.message || 'Unauthorized', 401);
   }
 
   if (!response.ok) {

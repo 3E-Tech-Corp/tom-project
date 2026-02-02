@@ -31,7 +31,7 @@ public class AuthController : ControllerBase
     {
         using var conn = CreateConnection();
         var user = await conn.QueryFirstOrDefaultAsync<User>(
-            "SELECT * FROM Users WHERE Username = @Username AND IsActive = 1",
+            "SELECT * FROM Users WHERE (Username = @Username OR Email = @Username) AND IsActive = 1",
             new { request.Username });
 
         if (user == null || !_authService.VerifyPassword(request.Password, user.PasswordHash))
