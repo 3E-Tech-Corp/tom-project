@@ -7,7 +7,7 @@ using ProjectTemplate.Api.Services;
 namespace ProjectTemplate.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("[controller]")]
 [Authorize]
 public class SelectionsController : ControllerBase
 {

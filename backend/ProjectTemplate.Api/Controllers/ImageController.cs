@@ -8,7 +8,7 @@ using ProjectTemplate.Api.Models;
 namespace ProjectTemplate.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("[controller]")]
 public class ImageController : ControllerBase
 {
     private readonly IConfiguration _config;

@@ -8,7 +8,7 @@ using ProjectTemplate.Api.Models;
 namespace ProjectTemplate.Api.Controllers;
 
 [ApiController]
-[Route("api/dress-designs")]
+[Route("dress-designs")]
 [Authorize]
 public class DressDesignController : ControllerBase
 {
