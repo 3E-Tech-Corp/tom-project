@@ -1,0 +1,189 @@
+name: Setup IIS Site
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_name:
+        description: 'IIS Site Name (e.g. dressapp.synthia.bot)'
+        required: true
+        type: string
+      host_header:
+        description: 'Host header binding (defaults to site_name)'
+        required: false
+        type: string
+      db_name:
+        description: 'SQL Server database name (leave empty to skip DB creation)'
+        required: false
+        type: string
+      dotnet_version:
+        description: '.NET CLR version (v4.0 = .NET 4+/Core, "" = No Managed Code)'
+        required: false
+        default: 'v4.0'
+        type: string
+
+jobs:
+  setup:
+    name: Create IIS Site + App Pool
+    runs-on: [self-hosted, windows, iis]
+    steps:
+      - name: Setup IIS Site
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          Import-Module WebAdministration
+
+          $siteName = "${{ inputs.site_name }}"
+          $hostHeader = "${{ inputs.host_header }}"
+          if (-not $hostHeader) { $hostHeader = $siteName }
+          $dotnetVersion = "${{ inputs.dotnet_version }}"
+
+          $basePath = "F:\New_WWW\$siteName"
+          $wwwPath = "$basePath\WWW"
+          $apiPath = "$basePath\API"
+
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "Setting up: $siteName" -ForegroundColor Cyan
+          Write-Host "Host header: $hostHeader" -ForegroundColor Gray
+          Write-Host "Path: $basePath" -ForegroundColor Gray
+          Write-Host "========================================" -ForegroundColor Cyan
+
+          # Create directories
+          foreach ($dir in @($basePath, $wwwPath, $apiPath)) {
+            if (!(Test-Path $dir)) {
+              New-Item -ItemType Directory -Path $dir -Force | Out-Null
+              Write-Host "Created: $dir" -ForegroundColor Green
+            } else {
+              Write-Host "Exists: $dir" -ForegroundColor Gray
+            }
+          }
+
+          # Create App Pool
+          if (!(Test-Path "IIS:\AppPools\$siteName")) {
+            New-WebAppPool -Name $siteName
+            Set-ItemProperty "IIS:\AppPools\$siteName" -Name managedRuntimeVersion -Value $dotnetVersion
+            Set-ItemProperty "IIS:\AppPools\$siteName" -Name managedPipelineMode -Value "Integrated"
+            Write-Host "App Pool created: $siteName" -ForegroundColor Green
+          } else {
+            Write-Host "App Pool exists: $siteName" -ForegroundColor Yellow
+          }
+
+          # Create IIS Site (HTTP 80 + host header — Cloudflare handles SSL)
+          if (!(Get-Website -Name $siteName -ErrorAction SilentlyContinue)) {
+            New-Website -Name $siteName `
+              -PhysicalPath $wwwPath `
+              -ApplicationPool $siteName `
+              -HostHeader $hostHeader `
+              -Port 80
+            Write-Host "Site created: $siteName (http://$hostHeader)" -ForegroundColor Green
+          } else {
+            Write-Host "Site exists: $siteName" -ForegroundColor Yellow
+          }
+
+          # Create /api virtual application pointing to API folder
+          $apiApp = Get-WebApplication -Site $siteName -Name "api" -ErrorAction SilentlyContinue
+          if (!$apiApp) {
+            New-WebApplication -Site $siteName -Name "api" -PhysicalPath $apiPath -ApplicationPool $siteName
+            Write-Host "Virtual app created: /api -> $apiPath" -ForegroundColor Green
+          } else {
+            Write-Host "Virtual app exists: /api" -ForegroundColor Yellow
+          }
+
+          # Add a default index.html so the site responds immediately
+          $indexPath = "$wwwPath\index.html"
+          if (!(Test-Path $indexPath)) {
+            Set-Content -Path $indexPath -Value "<html><body><h1>$siteName</h1><p>Site is ready. Deploy to populate.</p></body></html>"
+            Write-Host "Placeholder index.html created" -ForegroundColor Green
+          }
+
+          # Add web.config for SPA routing
+          $webConfigPath = "$wwwPath\web.config"
+          if (!(Test-Path $webConfigPath)) {
+            $webConfig = @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <system.webServer>
+              <rewrite>
+                <rules>
+                  <rule name="SPA" stopProcessing="true">
+                    <match url=".*" />
+                    <conditions logicalGrouping="MatchAll">
+                      <add input="{REQUEST_URI}" pattern="^/api" negate="true" />
+                      <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+                      <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+                    </conditions>
+                    <action type="Rewrite" url="/index.html" />
+                  </rule>
+                </rules>
+              </rewrite>
+            </system.webServer>
+          </configuration>
+          "@
+            Set-Content -Path $webConfigPath -Value $webConfig
+            Write-Host "SPA web.config created" -ForegroundColor Green
+          }
+
+          Write-Host "`n========================================" -ForegroundColor Cyan
+          Write-Host "Setup complete!" -ForegroundColor Green
+          Write-Host "Site: http://$hostHeader" -ForegroundColor Gray
+          Write-Host "API:  http://$hostHeader/api" -ForegroundColor Gray
+          Write-Host "========================================" -ForegroundColor Cyan
+
+      - name: Create Database
+        if: inputs.db_name != ''
+        shell: powershell
+        run: |
+          $dbName = "${{ inputs.db_name }}"
+          Write-Host "Creating database: $dbName" -ForegroundColor Yellow
+          try {
+            $sql = @"
+            IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'$dbName')
+            BEGIN
+              CREATE DATABASE [$dbName];
+              PRINT 'Database created: $dbName';
+            END
+            ELSE
+              PRINT 'Database already exists: $dbName';
+          "@
+            Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -TrustServerCertificate
+            Write-Host "Database ready: $dbName" -ForegroundColor Green
+          } catch {
+            Write-Host "WARNING: DB creation failed: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "Create it manually if needed." -ForegroundColor Yellow
+          }
+
+      - name: Create appsettings.Production.json
+        if: inputs.db_name != ''
+        shell: powershell
+        run: |
+          $siteName = "${{ inputs.site_name }}"
+          $dbName = "${{ inputs.db_name }}"
+          $hostHeader = "${{ inputs.host_header }}"
+          if (-not $hostHeader) { $hostHeader = $siteName }
+          $apiPath = "F:\New_WWW\$siteName\API"
+          $configPath = "$apiPath\appsettings.Production.json"
+
+          if (!(Test-Path $configPath)) {
+            # Generate a random JWT key
+            $jwtKey = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 32 | ForEach-Object { [char]$_ })
+
+            $config = @{
+              ConnectionStrings = @{
+                DefaultConnection = "Server=localhost;Database=$dbName;User ID=ftsql;Password=letsroc;TrustServerCertificate=true;MultipleActiveResultSets=true"
+              }
+              Jwt = @{
+                Key = $jwtKey
+                Issuer = "ProjectTemplate"
+                Audience = "ProjectTemplate"
+                ExpiryHours = 24
+              }
+              Cors = @{
+                Origins = "https://$hostHeader"
+              }
+            } | ConvertTo-Json -Depth 3
+
+            Set-Content -Path $configPath -Value $config
+            Write-Host "Created: $configPath" -ForegroundColor Green
+            Write-Host "JWT Key: $jwtKey (saved in config)" -ForegroundColor Gray
+          } else {
+            Write-Host "Config already exists: $configPath" -ForegroundColor Yellow
+          }
