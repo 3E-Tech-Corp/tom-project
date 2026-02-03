@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { dressApi, type Dress, type DressCategory, type CreateDressRequest } from '../services/api';
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
@@ -22,6 +22,7 @@ export default function AdminDresses() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [imagePreviewStatus, setImagePreviewStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
 
   const fetchData = async () => {
     setLoading(true);
@@ -43,6 +44,7 @@ export default function AdminDresses() {
     setForm(emptyDress);
     setShowForm(true);
     setError('');
+    setImagePreviewStatus('idle');
   };
 
   const openEdit = (dress: Dress) => {
@@ -59,6 +61,7 @@ export default function AdminDresses() {
     });
     setShowForm(true);
     setError('');
+    setImagePreviewStatus(dress.imageUrl ? 'loading' : 'idle');
   };
 
   const handleSave = async () => {
@@ -161,10 +164,50 @@ export default function AdminDresses() {
                 <input
                   type="text"
                   value={form.imageUrl}
-                  onChange={(e) => updateField('imageUrl', e.target.value)}
+                  onChange={(e) => {
+                    updateField('imageUrl', e.target.value);
+                    setImagePreviewStatus(e.target.value.trim() ? 'loading' : 'idle');
+                  }}
                   className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
                   placeholder="https://picsum.photos/400/533"
                 />
+                {/* Image URL Preview */}
+                {form.imageUrl.trim() && (
+                  <div className="mt-3 rounded-lg border border-gray-600 overflow-hidden bg-gray-900/50">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
+                      <span className="text-xs font-medium text-gray-400">Image Preview</span>
+                      {imagePreviewStatus === 'loading' && (
+                        <span className="flex items-center gap-1.5 text-xs text-yellow-400">
+                          <div className="w-3 h-3 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+                          Loading...
+                        </span>
+                      )}
+                      {imagePreviewStatus === 'loaded' && (
+                        <span className="text-xs text-green-400">✓ Image loaded</span>
+                      )}
+                      {imagePreviewStatus === 'error' && (
+                        <span className="text-xs text-red-400">✗ Failed to load</span>
+                      )}
+                    </div>
+                    <div className="p-3 flex items-center justify-center" style={{ minHeight: 120 }}>
+                      {imagePreviewStatus === 'error' ? (
+                        <div className="text-center py-4">
+                          <p className="text-red-400 text-sm font-medium">Image could not be loaded</p>
+                          <p className="text-gray-500 text-xs mt-1">Make sure the URL points directly to an image file (.jpg, .png, etc.)</p>
+                          <p className="text-gray-500 text-xs">Webpage URLs (Amazon, Pinterest, etc.) won't work — use the direct image link</p>
+                        </div>
+                      ) : (
+                        <img
+                          src={form.imageUrl.trim()}
+                          alt="Preview"
+                          className="max-h-48 max-w-full object-contain rounded"
+                          onLoad={() => setImagePreviewStatus('loaded')}
+                          onError={() => setImagePreviewStatus('error')}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
