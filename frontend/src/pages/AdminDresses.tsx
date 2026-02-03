@@ -1,20 +1,13 @@
 import { useState, useEffect } from 'react';
-import { dressApi, type Dress, type DressCategory, type CreateDressRequest } from '../services/api';
-
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-const COLORS = [
-  'Black', 'White', 'Red', 'Pink', 'Blue', 'Navy',
-  'Green', 'Purple', 'Gold', 'Silver', 'Ivory', 'Burgundy',
-];
+import { dressApi, type Dress, type CreateDressRequest } from '../services/api';
 
 const emptyDress: CreateDressRequest = {
-  name: '', description: '', imageUrl: '', category: '',
-  size: 'M', color: 'Black', price: 0, inStock: true,
+  name: '', description: '', imageUrl: '', category: 'General',
+  size: 'M', color: 'Black', price: 1, inStock: true,
 };
 
 export default function AdminDresses() {
   const [dresses, setDresses] = useState<Dress[]>([]);
-  const [categories, setCategories] = useState<DressCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -27,9 +20,8 @@ export default function AdminDresses() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [d, c] = await Promise.all([dressApi.list(), dressApi.categories()]);
+      const d = await dressApi.list();
       setDresses(d);
-      setCategories(c);
     } catch {
       // ignore
     } finally {
@@ -66,8 +58,6 @@ export default function AdminDresses() {
 
   const handleSave = async () => {
     if (!form.name.trim()) { setError('Name is required'); return; }
-    if (!form.category) { setError('Category is required'); return; }
-    if (form.price <= 0) { setError('Price must be greater than 0'); return; }
 
     setSaving(true);
     setError('');
@@ -149,17 +139,6 @@ export default function AdminDresses() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => updateField('description', e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none"
-                  placeholder="A stunning floor-length gown with sequin details..."
-                />
-              </div>
-
-              <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Image URL</label>
                 <input
                   type="text"
@@ -169,7 +148,7 @@ export default function AdminDresses() {
                     setImagePreviewStatus(e.target.value.trim() ? 'loading' : 'idle');
                   }}
                   className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  placeholder="https://picsum.photos/400/533"
+                  placeholder="https://example.com/dress-image.jpg"
                 />
                 {/* Image URL Preview */}
                 {form.imageUrl.trim() && (
@@ -209,70 +188,6 @@ export default function AdminDresses() {
                   </div>
                 )}
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Category *</label>
-                  <select
-                    value={form.category}
-                    onChange={(e) => updateField('category', e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  >
-                    <option value="">Select category</option>
-                    {categories.map(c => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Price *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={form.price || ''}
-                    onChange={(e) => updateField('price', Number(e.target.value))}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                    placeholder="99.99"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Size</label>
-                  <select
-                    value={form.size}
-                    onChange={(e) => updateField('size', e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  >
-                    {SIZES.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Color</label>
-                  <select
-                    value={form.color}
-                    onChange={(e) => updateField('color', e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  >
-                    {COLORS.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.inStock}
-                  onChange={(e) => updateField('inStock', e.target.checked)}
-                  className="rounded border-gray-600 bg-gray-700 text-rose-500 focus:ring-rose-500"
-                />
-                <span className="text-sm text-gray-300">In Stock</span>
-              </label>
             </div>
             <div className="p-6 border-t border-gray-700 flex justify-end gap-3">
               <button
@@ -306,69 +221,40 @@ export default function AdminDresses() {
         </div>
       ) : (
         <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-700">
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Dress</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400 hidden md:table-cell">Category</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400 hidden md:table-cell">Size</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Price</th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400 hidden sm:table-cell">Stock</th>
-                <th className="text-right px-6 py-4 text-sm font-medium text-gray-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-700">
-              {dresses.map(dress => (
-                <tr key={dress.id} className="hover:bg-gray-750 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={dress.imageUrl || `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=80&h=80&fit=crop&q=80`}
-                        alt={dress.name}
-                        className="w-10 h-10 rounded-lg object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=80&h=80&fit=crop&q=80`;
-                        }}
-                      />
-                      <div>
-                        <p className="text-white font-medium">{dress.name}</p>
-                        <p className="text-gray-400 text-xs">{dress.color}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 hidden md:table-cell">
-                    <span className="px-2 py-1 bg-rose-600/20 text-rose-400 rounded-full text-xs font-medium">
-                      {dress.category}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-300 hidden md:table-cell">{dress.size}</td>
-                  <td className="px-6 py-4 text-rose-400 font-semibold">${dress.price.toFixed(2)}</td>
-                  <td className="px-6 py-4 hidden sm:table-cell">
-                    <span className={`text-xs font-medium ${dress.inStock ? 'text-green-400' : 'text-red-400'}`}>
-                      {dress.inStock ? '✓ In Stock' : '✗ Out'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => openEdit(dress)}
-                        className="px-3 py-1.5 text-xs text-blue-400 hover:text-white hover:bg-blue-600 border border-blue-500/30 hover:border-blue-600 rounded-lg transition-all"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(dress.id)}
-                        disabled={deletingId === dress.id}
-                        className="px-3 py-1.5 text-xs text-red-400 hover:text-white hover:bg-red-600 border border-red-500/30 hover:border-red-600 rounded-lg transition-all disabled:opacity-50"
-                      >
-                        {deletingId === dress.id ? '...' : 'Delete'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+            {dresses.map(dress => (
+              <div key={dress.id} className="bg-gray-900/50 rounded-xl border border-gray-700 overflow-hidden hover:border-gray-500 transition-all">
+                <div className="aspect-[3/4] overflow-hidden bg-gray-700 relative">
+                  <img
+                    src={dress.imageUrl || `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=400&h=533&fit=crop&q=80`}
+                    alt={dress.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=400&h=533&fit=crop&q=80`;
+                    }}
+                  />
+                </div>
+                <div className="p-3">
+                  <p className="text-white font-medium truncate">{dress.name}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={() => openEdit(dress)}
+                      className="flex-1 px-3 py-1.5 text-xs text-blue-400 hover:text-white hover:bg-blue-600 border border-blue-500/30 hover:border-blue-600 rounded-lg transition-all text-center"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(dress.id)}
+                      disabled={deletingId === dress.id}
+                      className="flex-1 px-3 py-1.5 text-xs text-red-400 hover:text-white hover:bg-red-600 border border-red-500/30 hover:border-red-600 rounded-lg transition-all disabled:opacity-50 text-center"
+                    >
+                      {deletingId === dress.id ? '...' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
