@@ -1,5 +1,10 @@
 namespace ProjectTemplate.Api.Models;
 
+public class RemoveBackgroundRequest
+{
+    public string ImageUrl { get; set; } = string.Empty;
+}
+
 public class Dress
 {
     public int Id { get; set; }

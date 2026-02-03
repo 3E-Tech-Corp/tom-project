@@ -59,6 +59,7 @@ jobs:
     runs-on: self-hosted
     env:
       SITE_NAME: ${{ github.event.inputs.site_name || vars.IIS_SITE_NAME }}
+      FAL_KEY: ${{ secrets.FAL_KEY }}
     steps:
       - name: Download Backend Artifact
         uses: actions/download-artifact@v4
@@ -77,6 +78,17 @@ jobs:
         with:
           name: deployment
           path: artifacts/deployment
+
+      - name: Inject FAL Key
+        shell: powershell
+        run: |
+          $configPath = "artifacts\backend\appsettings.json"
+          if (Test-Path $configPath) {
+            $content = Get-Content $configPath -Raw
+            $content = $content -replace '__FAL_KEY__', "$env:FAL_KEY"
+            Set-Content $configPath $content
+            Write-Host "FAL key injected into appsettings.json"
+          }
 
       - name: Deploy to IIS
         shell: powershell

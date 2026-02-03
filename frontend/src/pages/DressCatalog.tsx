@@ -213,12 +213,24 @@ export default function DressCatalog() {
                   key={dress.id}
                   to={`/dresses/${dress.id}`}
                   className="group bg-gray-800 rounded-xl border border-gray-700 overflow-hidden hover:border-rose-500/50 hover:shadow-lg hover:shadow-rose-500/10 transition-all duration-300"
+                  style={{ transformStyle: 'preserve-3d' }}
+                  onMouseMove={(e) => {
+                    const card = e.currentTarget;
+                    const rect = card.getBoundingClientRect();
+                    const x = (e.clientX - rect.left) / rect.width - 0.5;
+                    const y = (e.clientY - rect.top) / rect.height - 0.5;
+                    card.style.transform = `perspective(600px) rotateY(${x * 12}deg) rotateX(${-y * 12}deg) scale3d(1.02, 1.02, 1.02)`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'perspective(600px) rotateY(0deg) rotateX(0deg) scale3d(1, 1, 1)';
+                  }}
                 >
-                  <div className="aspect-[3/4] overflow-hidden bg-gray-700 relative">
+                  <div className="aspect-[3/4] overflow-hidden relative" style={{ background: 'radial-gradient(circle, #1f1f2e 0%, #111118 100%)' }}>
                     <img
                       src={dress.imageUrl || `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=400&h=533&fit=crop&q=80`}
                       alt={dress.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                      style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.5))' }}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=400&h=533&fit=crop&q=80`;
                       }}

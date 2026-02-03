@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using ProjectTemplate.Api.Models;
+using ProjectTemplate.Api.Services;
 
 namespace ProjectTemplate.Api.Controllers;
 
@@ -14,14 +15,20 @@ public class ImageController : ControllerBase
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<ImageController> _logger;
+    private readonly BackgroundRemovalService _bgRemoval;
     private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
     private static readonly string[] AllowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
 
-    public ImageController(IConfiguration config, IWebHostEnvironment env, ILogger<ImageController> logger)
+    public ImageController(
+        IConfiguration config,
+        IWebHostEnvironment env,
+        ILogger<ImageController> logger,
+        BackgroundRemovalService bgRemoval)
     {
         _config = config;
         _env = env;
         _logger = logger;
+        _bgRemoval = bgRemoval;
     }
 
     private SqlConnection CreateConnection() =>
@@ -107,6 +114,24 @@ public class ImageController : ControllerBase
         await conn.ExecuteAsync("DELETE FROM UserPhotos WHERE Id = @Id", new { Id = id });
         _logger.LogInformation("User photo {Id} deleted by user {UserId}", id, userId);
         return Ok(new { message = "Photo deleted" });
+    }
+
+    /// <summary>
+    /// Remove background from an image URL
+    /// </summary>
+    [HttpPost("remove-background")]
+    [Authorize]
+    public async Task<IActionResult> RemoveBackground([FromBody] RemoveBackgroundRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.ImageUrl))
+            return BadRequest(new { message = "Image URL is required" });
+
+        var resultUrl = await _bgRemoval.RemoveBackgroundAsync(request.ImageUrl);
+        if (resultUrl == null)
+            return StatusCode(500, new { message = "Background removal failed. Make sure the URL points to a valid image." });
+
+        _logger.LogInformation("Background removed: {Input} → {Output}", request.ImageUrl, resultUrl);
+        return Ok(new { url = resultUrl });
     }
 
     private async Task<ImageUploadResponse?> SaveFile(IFormFile? file, string subfolder)

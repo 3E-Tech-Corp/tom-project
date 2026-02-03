@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { dressApi, type Dress, type CreateDressRequest } from '../services/api';
+import { dressApi, imageApi, type Dress, type CreateDressRequest } from '../services/api';
 
 const emptyDress: CreateDressRequest = {
   name: '', description: '', imageUrl: '', category: 'General',
@@ -16,6 +16,7 @@ export default function AdminDresses() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [imagePreviewStatus, setImagePreviewStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const [removingBg, setRemovingBg] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -91,6 +92,33 @@ export default function AdminDresses() {
 
   const updateField = <K extends keyof CreateDressRequest>(key: K, value: CreateDressRequest[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleRemoveBackground = async () => {
+    if (!form.imageUrl.trim()) return;
+    setRemovingBg(true);
+    setError('');
+    try {
+      const result = await imageApi.removeBackground(form.imageUrl.trim());
+      updateField('imageUrl', result.url);
+      setImagePreviewStatus('loading');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Background removal failed');
+    } finally {
+      setRemovingBg(false);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    card.style.transform = `perspective(600px) rotateY(${x * 15}deg) rotateX(${-y * 15}deg) scale3d(1.03, 1.03, 1.03)`;
+  };
+
+  const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.currentTarget.style.transform = 'perspective(600px) rotateY(0deg) rotateX(0deg) scale3d(1, 1, 1)';
   };
 
   return (
@@ -185,6 +213,31 @@ export default function AdminDresses() {
                         />
                       )}
                     </div>
+                    {/* Remove Background Button */}
+                    {imagePreviewStatus === 'loaded' && (
+                      <div className="px-3 pb-3">
+                        <button
+                          type="button"
+                          onClick={handleRemoveBackground}
+                          disabled={removingBg}
+                          className="w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                        >
+                          {removingBg ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Removing background...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              ✨ Remove Background
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -223,12 +276,19 @@ export default function AdminDresses() {
         <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
             {dresses.map(dress => (
-              <div key={dress.id} className="bg-gray-900/50 rounded-xl border border-gray-700 overflow-hidden hover:border-gray-500 transition-all">
-                <div className="aspect-[3/4] overflow-hidden bg-gray-700 relative">
+              <div
+                key={dress.id}
+                className="bg-gray-900/50 rounded-xl border border-gray-700 overflow-hidden hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10"
+                style={{ transition: 'transform 0.15s ease-out, border-color 0.3s, box-shadow 0.3s', transformStyle: 'preserve-3d' }}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+              >
+                <div className="aspect-[3/4] overflow-hidden relative" style={{ background: 'radial-gradient(circle, #1a1a2e 0%, #0d0d1a 100%)' }}>
                   <img
                     src={dress.imageUrl || `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=400&h=533&fit=crop&q=80`}
                     alt={dress.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain drop-shadow-2xl"
+                    style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.5))' }}
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1518622358385-8ea7d0794bf6?w=400&h=533&fit=crop&q=80`;
                     }}

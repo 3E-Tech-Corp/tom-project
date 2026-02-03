@@ -70,8 +70,13 @@ builder.Services.AddCors(options =>
 });
 
 // Register services
+builder.Services.AddHttpClient("FalAi", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
 builder.Services.AddSingleton<AuthService>();
 builder.Services.AddSingleton<DressService>();
+builder.Services.AddSingleton<BackgroundRemovalService>();
 
 var app = builder.Build();
 

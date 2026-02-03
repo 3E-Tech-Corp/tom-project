@@ -162,5 +162,10 @@ export const selectionApi = {
     api.delete<{ message: string }>(`/selections/${id}`),
 };
 
+export const imageApi = {
+  removeBackground: (imageUrl: string) =>
+    api.post<{ url: string }>('/image/remove-background', { imageUrl }),
+};
+
 export { ApiError };
 export default api;
