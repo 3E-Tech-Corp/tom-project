@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { dressApi, type Dress, type DressCategory, type CreateDressRequest } from '../services/api';
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
