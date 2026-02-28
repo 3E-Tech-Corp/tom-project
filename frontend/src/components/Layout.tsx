@@ -13,6 +13,7 @@ const navItems: NavItem[] = [
   { path: '/dashboard', label: '📊 Dashboard', requiresAuth: true },
   { path: '/selections', label: '💕 My Selections', requiresAuth: true },
   { path: '/admin/dresses', label: '🛠️ Manage Dresses', adminOnly: true },
+  { path: '/admin/qr-generator', label: '📱 QR Generator', adminOnly: true },
 ];
 
 export default function Layout() {

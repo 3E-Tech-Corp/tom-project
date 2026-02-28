@@ -7,6 +7,7 @@ import DressCatalog from './pages/DressCatalog';
 import DressDetail from './pages/DressDetail';
 import MySelections from './pages/MySelections';
 import AdminDresses from './pages/AdminDresses';
+import QrGenerator from './pages/QrGenerator';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -59,6 +60,16 @@ export default function App() {
             <PrivateRoute>
               <AdminRoute>
                 <AdminDresses />
+              </AdminRoute>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="admin/qr-generator"
+          element={
+            <PrivateRoute>
+              <AdminRoute>
+                <QrGenerator />
               </AdminRoute>
             </PrivateRoute>
           }

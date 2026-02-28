@@ -74,6 +74,7 @@ builder.Services.AddHttpClient("FalAi", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);
 });
+builder.Services.AddHttpClient();
 builder.Services.AddSingleton<AuthService>();
 builder.Services.AddSingleton<DressService>();
 builder.Services.AddSingleton<BackgroundRemovalService>();
